@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f3f5f8"/>
+  <rect width="1280" height="52" fill="#032c28"/>
+  <rect x="16" y="12" width="28" height="28" rx="6" fill="#01a982"/>
+  <text x="24" y="32" fill="#032c28" font-family="Segoe UI, Arial" font-size="13" font-weight="700">N</text>
+  <text x="52" y="24" fill="#fff" font-family="Segoe UI, Arial" font-size="14" font-weight="650">Switch Console GUI</text>
+  <rect y="52" width="260" height="668" fill="#fff" stroke="#d8dee6"/>
+  <rect x="260" y="52" width="1020" height="40" fill="#fff" stroke="#d8dee6"/>
+  <text x="490" y="78" fill="#032c28" font-family="Segoe UI, Arial" font-size="13" font-weight="700">CLI library</text>
+  <line x1="488" y1="90" x2="580" y2="90" stroke="#01a982" stroke-width="3"/>
+  <rect x="276" y="108" width="980" height="430" rx="12" fill="#fff" stroke="#d8dee6"/>
+  <text x="296" y="136" fill="#032c28" font-family="Segoe UI, Arial" font-size="14" font-weight="700">Command library</text>
+  <rect x="296" y="150" width="700" height="34" rx="8" fill="#f7f9fb" stroke="#d8dee6"/>
+  <text x="310" y="172" fill="#5c6b7a" font-family="Segoe UI, Arial" font-size="13">neighbors</text>
+  <rect x="1006" y="150" width="90" height="34" rx="8" fill="#01a982"/>
+  <text x="1028" y="172" fill="#032c28" font-family="Segoe UI, Arial" font-size="13" font-weight="700">Search</text>
+  <rect x="296" y="200" width="940" height="96" rx="12" fill="#fff" stroke="#d8dee6"/>
+  <text x="312" y="224" fill="#032c28" font-family="Segoe UI, Arial" font-size="14" font-weight="700">Layer-2 neighbors</text>
+  <text x="312" y="248" fill="#0b5c4a" font-family="Consolas, monospace" font-size="13">show cdp neighbors</text>
+  <text x="312" y="268" fill="#5c6b7a" font-family="Segoe UI, Arial" font-size="11">HPE ProVision: show lldp info remote-device</text>
+  <rect x="296" y="308" width="940" height="80" rx="12" fill="#fff" stroke="#d8dee6"/>
+  <text x="312" y="332" fill="#032c28" font-family="Segoe UI, Arial" font-size="14" font-weight="700">Save to flash</text>
+  <text x="312" y="356" fill="#0b5c4a" font-family="Consolas, monospace" font-size="13">write memory</text>
+  <rect x="260" y="556" width="1020" height="164" fill="#0e1a18"/>
+  <rect x="260" y="556" width="1020" height="28" fill="#032c28"/>
+  <text x="276" y="575" fill="#9db5af" font-family="Segoe UI, Arial" font-size="12">Switch CLI</text>
+  <text x="276" y="608" fill="#c6eadc" font-family="Consolas, monospace" font-size="12">CORE-C9300# show cdp neighbors</text>
+</svg>
