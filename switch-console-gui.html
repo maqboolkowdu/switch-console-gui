@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Site Console — Health, Faceplate, Topology</title>
+  <style>
+    :root {
+      --bg:#f3f5f8; --panel:#ffffff; --panel-2:#ffffff; --line:#d8dee6;
+      --text:#1b2430; --muted:#5c6b7a; --accent:#01a982; --accent-2:#01a982;
+      --ok:#01a982; --warn:#ff8300; --danger:#c70036;
+      --hpe:#01a982; --hpe-dark:#032c28;
+      --mono:"Cascadia Mono","Consolas","SF Mono",ui-monospace,monospace;
+      --sans:"Metric","Segoe UI",system-ui,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans)}
+    body{display:flex;flex-direction:column;min-height:100vh}
+    header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--hpe-dark);color:#fff;flex-wrap:wrap}
+    header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.02em}
+    header .sub{color:#b7c9c4;font-size:12px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand-mark{width:28px;height:28px;border-radius:6px;background:var(--hpe);display:grid;place-items:center;font-weight:800;color:#032c28;font-size:13px}
+    .badge{font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid #2a4a45;color:#d5e8e3;background:#0a332d}
+    .badge.on{color:#b8f0d8;border-color:#01a982;background:#0b3d34}
+    .badge.off{color:#ffd0d8;border-color:#c70036;background:#3a1018}
+    .badge.info{color:#dff6ef;border-color:#01a982}
+    .health-pill{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#1b2430;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:650}
+    .health-pill .g{width:8px;height:8px;border-radius:50%;background:#01a982}
+    .wrap{display:grid;grid-template-columns:280px 1fr;flex:1;min-height:0}
+    aside{border-right:1px solid var(--line);background:#fff;padding:16px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+    main{display:flex;flex-direction:column;min-width:0;min-height:0}
+    label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em}
+    input,select,button,textarea{font-family:inherit;font-size:13px}
+    input,select,textarea{width:100%;background:#f7f9fb;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .btn{border:0;border-radius:8px;padding:8px 12px;cursor:pointer;background:var(--hpe);color:#032c28;font-weight:700}
+    .btn:hover{filter:brightness(1.05)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn.ghost{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .btn.ok{background:#01a982;color:#032c28}
+    .btn.warn{background:#ff8300;color:#3a1d00}
+    .btn.danger{background:#c70036;color:#fff}
+    .stack{display:flex;flex-direction:column;gap:8px}
+    .tabs{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--line);background:#fff;flex-wrap:wrap}
+    .tab{background:transparent;border:0;color:var(--muted);padding:12px 12px 10px;cursor:pointer;border-bottom:3px solid transparent;font-weight:650;font-size:13px}
+    .tab.active{color:var(--hpe-dark);border-bottom-color:var(--hpe)}
+    .pane{display:none;padding:16px 18px;overflow:auto;flex:1}
+    .pane.active{display:block}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+    th{color:var(--muted);font-weight:650;font-size:11px;text-transform:uppercase}
+    .term-wrap{border-top:1px solid var(--line);background:#0e1a18;display:flex;flex-direction:column;height:var(--term-h, 240px);min-height:36px;position:relative;flex-shrink:0}
+    .term-wrap.term-min{height:36px !important;max-height:36px}
+    .term-wrap.term-min #term,.term-wrap.term-min .cmdline,.term-wrap.term-min .term-resize{display:none !important}
+    .term-wrap.term-max{position:fixed;left:12px;right:12px;top:56px;bottom:12px;height:auto !important;max-height:none;z-index:45;border-radius:12px;box-shadow:0 20px 50px #032c2866;border:1px solid #1a3d38}
+    .term-wrap.term-max #term{flex:1 1 auto;min-height:0}
+    .ico-btn{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px}
+    .ico-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+    .term-bar{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:11px;color:#9db5af;background:#032c28;gap:8px;flex-shrink:0}
+    .term-bar .term-tools{display:flex;align-items:center;gap:6px}
+    .term-bar input[type=range]{width:90px}
+    #term{flex:1;margin:0;padding:8px 12px;overflow:auto;font-family:var(--mono);font-size:11.5px;line-height:1.4;white-space:pre-wrap;color:#c6eadc}
+    .cmdline{display:flex;gap:8px;padding:8px 12px;background:#032c28}
+    .cmdline input{font-family:var(--mono);background:#0e1a18;color:#e8f6f1;border-color:#1d4a43}
+    .term-resize{height:6px;cursor:ns-resize;background:#1a3d38}
+    .preview,.cmdbox{background:#f7f9fb;border:1px dashed var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;color:#244;white-space:pre-wrap}
+    .hint{font-size:12px;color:var(--muted);line-height:1.55}
+    .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px #1b24300a}
+    h2{font-size:14px;margin:0 0 10px}
+    h3{font-size:13px;margin:14px 0 8px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+    .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+    .kpi .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    .kpi .v{font-size:20px;font-weight:700;margin-top:4px;color:var(--hpe-dark)}
+    .kpi .s{font-size:11px;color:var(--muted);margin-top:2px}
+    .chassis{background:linear-gradient(180deg,#2b3438,#1a2226);border:1px solid #3a4654;border-radius:12px;padding:14px}
+    .chassis-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px}
+    .dot{width:12px;height:12px;border-radius:50%;background:#2a2a2a}
+    .dot.green{background:#01a982;box-shadow:0 0 8px #01a98299}
+    .dot.red{background:#c70036;box-shadow:0 0 8px #c7003699}
+    .dot.off{background:#4a555c}
+    .sys-leds{display:flex;gap:10px}
+    .sys-led{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted)}
+    .port-row{display:flex;gap:5px;flex-wrap:wrap}
+    .port-rows{display:flex;flex-direction:column;gap:8px}
+    .rj{width:36px;background:#12181b;border:1px solid #3a4450;border-radius:3px;padding:4px 2px 3px;cursor:pointer;text-align:center}
+    .rj .leds{display:flex;justify-content:space-between;padding:0 3px;height:6px}
+    .rj .l{width:6px;height:5px;border-radius:1px;background:#1b1f24}
+    .rj .l.link-up{background:#01a982;box-shadow:0 0 4px #01a982}
+    .rj .l.link-down{background:#c70036}
+    .rj .l.act-up{background:#ff8300}
+    .rj .slot{height:16px;margin:3px 2px 2px;background:#0a0d11;border:1px solid #2a323c;position:relative}
+    .rj.connected .slot::before{content:"";position:absolute;left:6px;right:6px;top:-2px;height:7px;background:#c4a574;border-radius:1px 1px 0 0}
+    .rj .num{font-size:9px;color:#c5d0d6}
+    .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+    .lib-item{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;background:#fff}
+    .lib-item code{font-family:var(--mono);color:#0b5c4a}
+    .lib-item .eq{font-size:12px;color:var(--muted);margin-top:4px}
+    #topo{width:100%;height:420px;background:#f7fbf9;border:1px solid var(--line);border-radius:12px}
+    .ol{margin:0;padding-left:18px}
+    .ol li{margin:6px 0;line-height:1.45}
+    @media(max-width:980px){.wrap{grid-template-columns:1fr}}
+    #tourOverlay{position:fixed;inset:0;z-index:80;display:none}
+    #tourOverlay.on{display:block}
+    #tourBlur{position:absolute;inset:0;background:#032c28cc;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+    #tourSpot{position:absolute;border-radius:12px;box-shadow:0 0 0 9999px #032c2870,0 0 0 3px #01a982;pointer-events:none;transition:all .25s ease;z-index:81}
+    #tourCard{position:absolute;z-index:82;width:min(360px,calc(100vw - 32px));background:#fff;border-radius:16px;padding:16px 16px 14px;box-shadow:0 16px 40px #032c2840;color:#1b2430}
+    #tourCard h3{margin:0 0 8px;font-size:16px}
+    #tourCard p{margin:0;font-size:13px;color:#5c6b7a;line-height:1.5}
+    #tourCard .tour-nav{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:8px}
+    #tourCard .tour-step{font-size:12px;color:#5c6b7a;font-weight:650}
+    .tour-target{position:relative;z-index:83 !important}
+    body.tour-lock{overflow:hidden}
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-mark">N</div>
+    <div>
+      <h1>Network Health</h1>
+      <div class="sub">Local console · site device view · link-node topology</div>
+    </div>
+  </div>
+  <span class="health-pill"><span class="g"></span> Site health</span>
+  <span id="connBadge" class="badge off">Disconnected</span>
+  <span class="badge info" id="osBadge">Cisco IOS</span>
+  <span class="badge" id="modelBadge">No inventory</span>
+  <button class="btn" id="btnTour" type="button">Start tutorial</button>
+</header>
+<div class="wrap">
+<aside>
+  <div class="stack">
+    <div>
+      <label>Access method</label>
+      <select id="access">
+        <option value="serial">Serial / USB console</option>
+        <option value="ssh">SSH</option>
+        <option value="telnet">Telnet</option>
+      </select>
+    </div>
+    <div id="netFields" style="display:none" class="stack">
+      <div>
+        <label>Switch IP or hostname</label>
+        <input id="netHost" placeholder="192.168.1.2" />
+      </div>
+      <div class="row">
+        <div>
+          <label>TCP port</label>
+          <input id="netPort" value="22" />
+        </div>
+        <div>
+          <label>Username</label>
+          <input id="netUser" value="admin" />
+        </div>
+      </div>
+      <div>
+        <label>Password</label>
+        <input id="netPass" type="password" autocomplete="off" />
+      </div>
+      <p class="hint">SSH and Telnet need the local companion: <code>python switch-console-server.py</code>. Serial does not.</p>
+    </div>
+    <div>
+      <label>Saved device profiles</label>
+      <select id="profileSel"><option value="">— none —</option></select>
+    </div>
+    <div>
+      <label>Profile name</label>
+      <input id="profileName" placeholder="HQ-Core-5406R" />
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="btnSaveProfile" type="button">Save profile</button>
+      <button class="btn ghost" id="btnDelProfile" type="button">Delete</button>
+    </div>
+    <div>
+      <label>Platform</label>
+      <select id="os">
+        <option value="auto">Auto-detect after poll</option>
+        <option value="cisco">Cisco IOS / IOS-XE</option>
+        <option value="provision" selected>HPE ProVision / ProCurve / Aruba OS-S</option>
+        <option value="comware">HPE Comware</option>
+        <option value="cx">Aruba CX</option>
+      </select>
+    </div>
+    <div id="serialLogin" class="stack">
+      <div>
+        <label>Console username</label>
+        <input id="conUser" placeholder="manager or operator user" />
+      </div>
+      <div>
+        <label>Console password</label>
+        <input id="conPass" type="password" autocomplete="off" />
+      </div>
+      <button class="btn ghost" id="btnSendLogin" type="button">Send username / password</button>
+    </div>
+    <div class="row">
+      <div>
+        <label>Baud</label>
+        <select id="baud">
+          <option selected>9600</option>
+          <option>19200</option>
+          <option>38400</option>
+          <option>57600</option>
+          <option>115200</option>
+        </select>
+      </div>
+      <div>
+        <label>Fallback ports</label>
+        <select id="portCount"><option>8</option><option>12</option><option>24</option><option selected>48</option><option>52</option></select>
+      </div>
+    </div>
+    <div>
+      <label>Cisco interface prefix</label>
+      <input id="ifPrefix" value="GigabitEthernet0/" />
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnConnect">Connect console</button>
+      <button class="btn ghost" id="btnDisconnect" disabled>Disconnect</button>
+    </div>
+    <div class="actions">
+      <button class="btn ok" id="btnPoll" disabled>Poll inventory</button>
+      <button class="btn ghost" id="btnWake">Wake (CR)</button>
+    </div>
+    <label><input type="checkbox" id="autoPoll" checked /> Auto-poll after connect</label>
+    <div class="actions">
+      <button class="btn ghost" id="btnEnable">enable</button>
+      <button class="btn ghost" id="btnEnterConfig">Config mode</button>
+      <button class="btn warn" id="btnSave">Save config</button>
+    </div>
+    <p class="hint">Use Chrome or Edge. Serve this file from localhost. Default Cisco console is 9600 8-N-1. Log in and reach privileged EXEC (<code>#</code>) before polling.</p>
+  </div>
+</aside>
+<main>
+<nav class="tabs" id="tourTabs">
+  <button class="tab active" data-tab="guide">Guide</button>
+  <button class="tab" data-tab="dash">Dashboard</button>
+  <button class="tab" data-tab="neigh">Neighbors</button>
+  <button class="tab" data-tab="lib">CLI library</button>
+  <button class="tab" data-tab="ports">Ports</button>
+  <button class="tab" data-tab="system">System</button>
+  <button class="tab" data-tab="security">Passwords</button>
+  <button class="tab" data-tab="vlans">VLANs</button>
+  <button class="tab" data-tab="portcfg">Port config</button>
+  <button class="tab" data-tab="show">Show</button>
+</nav>
+
+<section class="pane active" id="tab-guide">
+  <div class="card">
+    <h2>Field laptop — step by step</h2>
+    <div class="actions" style="margin-bottom:12px">
+      <button class="btn" id="btnTour2" type="button">Start interactive tutorial</button>
+    </div>
+    <ol class="ol">
+      <li>Copy <code>switch-console-gui.html</code> to a folder on the troubleshooting laptop, for example <code>C:\tools\switch-gui\</code>.</li>
+      <li>Install current <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>. Firefox and Safari cannot open the serial port.</li>
+      <li>Install <strong>Python 3</strong> if it is not already present (needed only to host the file on localhost). No other application is required. The neighbor diagram is drawn in the page itself.</li>
+      <li>Open Command Prompt or PowerShell in that folder and run:
+        <div class="preview" style="margin-top:8px">python -m http.server 8080</div>
+        Leave that window open.</li>
+      <li>Browse to <code>http://localhost:8080/switch-console-gui.html</code>.</li>
+      <li>Connect the console cable (USB-serial or the switch USB console). Install the adapter driver if Windows shows an unknown COM device (FTDI, CP210x, or Prolific).</li>
+      <li>Set <strong>Platform</strong> to <strong>Cisco IOS / IOS-XE</strong> for the first tests. Baud <strong>9600</strong> is the usual Cisco default; try 115200 if the screen is garbage.</li>
+      <li>Click <strong>Connect console</strong> and choose the COM port.</li>
+      <li>If you see a username or password prompt in the black console pane, type it in the raw line at the bottom and press Enter. Then type <code>enable</code> (or click <strong>enable</strong>) and the enable password so the prompt ends with <code>#</code>.</li>
+      <li>Click <strong>Poll inventory</strong>. The Dashboard faceplate, model, and port LEDs fill from <code>show version</code>, <code>show interfaces status</code>, and environment commands.</li>
+      <li>Open the <strong>Neighbors</strong> tab and click <strong>Map CDP + LLDP</strong>. That runs the discovery commands and draws local port ↔ neighbor port.</li>
+      <li>Use <strong>CLI library</strong> to search everyday words such as <code>neighbors</code>, <code>vlan</code>, <code>save</code>, or <code>trunk</code>. Each card shows the Cisco command and the HPE equivalent.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2>What you do not need</h2>
+    <p class="hint">PuTTY, Tera Term, SecureCRT, and Cisco CLI Analyzer are optional. This page talks to the COM port directly. Graphviz, Visio, and Python libraries are not used for the neighbor map. Keep Python only as a tiny web server so the browser allows Web Serial.</p>
+  </div>
+</section>
+
+<section class="pane" id="tab-dash">
+  <div class="kpi-grid" id="kpis"></div>
+  <div class="card" style="margin-top:12px">
+    <div class="chassis-top">
+      <div>
+        <div style="font-weight:700" id="faceModel">Not polled</div>
+        <div class="hint" id="faceSub">Connect, reach #, then poll.</div>
+      </div>
+      <div class="sys-leds">
+        <div class="sys-led"><div class="dot off" id="ledPwr"></div>PWR</div>
+        <div class="sys-led"><div class="dot off" id="ledSts"></div>STATUS</div>
+        <div class="sys-led"><div class="dot off" id="ledFan"></div>FAN</div>
+        <div class="sys-led"><div class="dot off" id="ledTmp"></div>TEMP</div>
+      </div>
+    </div>
+    <div class="chassis"><div class="port-rows" id="faceplate"></div></div>
+    <div class="legend">Green LED = link up (cable + partner). Red = enabled, no link. Dark = shutdown. Brown tab = link present.</div>
+  </div>
+  <div class="row">
+    <div class="card"><h2>Power / environment</h2><div id="healthPower" class="hint">No data.</div></div>
+    <div class="card"><h2>Modules / extras</h2><div id="healthEnv" class="hint">No data.</div></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-neigh">
+  <div class="card">
+    <h2>Link-node topology</h2>
+    <p class="hint">Layout follows HPE Aruba Networking Central: this switch as the local node, discovered neighbors as uplink/peer nodes, green link = adjacency present. Cisco uses CDP and LLDP. HPE uses LLDP (<code>show lldp info remote-device</code> / <code>display lldp neighbor-information</code>).</p>
+    <div class="actions">
+      <button class="btn ok" id="btnMap">Map CDP + LLDP</button>
+      <button class="btn ghost" id="btnCdp">CDP only</button>
+      <button class="btn ghost" id="btnLldp">LLDP only</button>
+    </div>
+    <svg id="topo" viewBox="0 0 1000 360"></svg>
+    <div style="overflow:auto;margin-top:10px">
+      <table>
+        <thead><tr><th>Protocol</th><th>Neighbor</th><th>Platform</th><th>Local port</th><th>Remote port</th></tr></thead>
+        <tbody id="neighTable"><tr><td colspan="5" class="hint">No neighbors parsed yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="pane" id="tab-lib">
+  <div class="card">
+    <h2>Command library</h2>
+    <p class="hint">Type an everyday word. Matching Cisco and HPE commands appear. Run sends the command for the platform selected on the left.</p>
+    <input id="libQ" placeholder="neighbors, vlan, trunk, save, interface, log, spanning-tree…" />
+    <div class="actions">
+      <button class="btn" id="btnLibSearch">Search</button>
+      <button class="btn ghost" id="btnLibAll">Show all</button>
+    </div>
+    <div id="libOut" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-ports">
+  <div class="card">
+    <h2>Interface status</h2>
+    <table>
+      <thead><tr><th>Port</th><th>Type</th><th>Name</th><th>Admin</th><th>Link</th><th>VLAN / mode</th><th>Cable</th></tr></thead>
+      <tbody id="portTable"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="pane" id="tab-system">
+  <div class="card">
+    <h2>Identity</h2>
+    <div class="row">
+      <div><label>Hostname</label><input id="hostname" /></div>
+      <div><label>Location</label><input id="location" /></div>
+    </div>
+    <div class="actions"><button class="btn" data-apply="system">Preview &amp; send</button></div>
+    <div class="preview" id="prev-system"></div>
+  </div>
+  <div class="card">
+    <h2>Management IPv4</h2>
+    <div class="row">
+      <div><label>VLAN / SVI</label><input id="mgmtVlan" value="1" /></div>
+      <div><label>IP address</label><input id="mgmtIp" /></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Mask</label><input id="mgmtMask" placeholder="255.255.255.0" /></div>
+      <div><label>Gateway</label><input id="mgmtGw" /></div>
+    </div>
+    <div class="actions"><button class="btn" data-apply="mgmt">Preview &amp; send</button></div>
+    <div class="preview" id="prev-mgmt"></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-security">
+  <div class="card">
+    <h2>Local credentials</h2>
+    <div class="row">
+      <div><label>Username</label><input id="adminUser" value="admin" /></div>
+      <div><label>Password / secret</label><input id="adminPass" type="password" autocomplete="new-password" /></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Enable secret (Cisco)</label><input id="enableSecret" type="password" autocomplete="new-password" /></div>
+      <div><label>Confirm password</label><input id="adminPass2" type="password" autocomplete="new-password" /></div>
+    </div>
+    <div class="actions"><button class="btn" data-apply="security">Preview &amp; send</button></div>
+    <div class="preview" id="prev-security"></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-vlans">
+  <div class="card">
+    <h2>VLAN</h2>
+    <div class="row">
+      <div><label>VLAN ID</label><input id="vlanId" /></div>
+      <div><label>Name</label><input id="vlanName" /></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Access / untagged ports</label><input id="vlanUntag" /></div>
+      <div><label>Trunk / tagged ports</label><input id="vlanTag" /></div>
+    </div>
+    <div class="actions">
+      <button class="btn" data-apply="vlan">Preview &amp; send</button>
+      <button class="btn danger" data-apply="vlan-del">Delete VLAN</button>
+    </div>
+    <div class="preview" id="prev-vlan"></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-portcfg">
+  <div class="card">
+    <h2>Port actions</h2>
+    <div class="row">
+      <div><label>Port or range</label><input id="portList" placeholder="1 or Gi0/1" /></div>
+      <div><label>Description</label><input id="portName" /></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Access VLAN</label><input id="portAccessVlan" /></div>
+      <div><label>Trunk allowed VLANs</label><input id="portTrunkVlans" /></div>
+    </div>
+    <div class="actions">
+      <button class="btn ok" data-apply="port-up">Enable</button>
+      <button class="btn danger" data-apply="port-down">Disable</button>
+      <button class="btn" data-apply="port-name">Description</button>
+      <button class="btn" data-apply="port-access">Access</button>
+      <button class="btn" data-apply="port-trunk">Trunk</button>
+    </div>
+    <div class="preview" id="prev-port"></div>
+  </div>
+</section>
+
+<section class="pane" id="tab-show">
+  <div class="card">
+    <h2>Quick show</h2>
+    <div class="actions">
+      <button class="btn ghost" data-show="vlan">VLANs</button>
+      <button class="btn ghost" data-show="int">Interfaces</button>
+      <button class="btn ghost" data-show="run">Running-config</button>
+      <button class="btn ghost" data-show="ver">Version</button>
+      <button class="btn ghost" data-show="log">Log</button>
+      <button class="btn ghost" data-show="stp">Spanning-tree</button>
+      <button class="btn ghost" data-show="mac">MAC table</button>
+    </div>
+  </div>
+</section>
+
+<div class="term-wrap" id="termWrap">
+  <div class="term-bar">
+    <span>Switch CLI</span>
+    <div class="term-tools">
+      <label style="color:#9db5af;text-transform:none;letter-spacing:0;margin:0">Height</label>
+      <input type="range" id="termScale" min="120" max="560" value="240" />
+      <button class="btn ghost ico-btn" id="btnTermMin" type="button" title="Minimize">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5h10"/></svg>
+      </button>
+      <button class="btn ghost ico-btn" id="btnTermMax" type="button" title="Expand">
+        <svg viewBox="0 0 16 16" aria-hidden="true" id="icoMax"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>
+      </button>
+      <button class="btn ghost ico-btn" id="btnClearTerm" type="button" title="Clear">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  </div>
+  <pre id="term"></pre>
+  <div class="cmdline">
+    <input id="rawCmd" placeholder="At Username: type only the account name — not show commands" />
+    <button class="btn ghost" id="btnSendRaw">Send</button>
+  </div>
+  <div class="term-resize" id="termResize"></div>
+</div>
+</main>
+</div>
+
+<div id="tourOverlay">
+  <div id="tourBlur"></div>
+  <div id="tourSpot"></div>
+  <div id="tourCard">
+    <h3 id="tourTitle"></h3>
+    <p id="tourBody"></p>
+    <div class="tour-nav">
+      <span class="tour-step" id="tourStep"></span>
+      <div class="actions" style="margin:0">
+        <button class="btn ghost" id="tourSkip" type="button">Skip</button>
+        <button class="btn ghost" id="tourPrev" type="button">Back</button>
+        <button class="btn" id="tourNext" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const termEl = $("term");
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let port=null, reader=null, writer=null, keepReading=false, rxBuf="";
+  let netMode=false, evtSrc=null;
+  const state = { model:"", firmware:"", hostname:"", ports:[], health:{power:"unknown",status:"unknown",fan:"unknown",temp:"unknown",details:"",modules:""}, neighbors:[] };
+
+  const LIB = [
+    { q:"neighbors cdp lldp topology map adjacent", title:"Layer-2 neighbors",
+      cisco:"show cdp neighbors", cisco2:"show lldp neighbors",
+      provision:"show lldp info remote-device", comware:"display lldp neighbor-information", cx:"show lldp neighbor-info",
+      note:"Cisco uses CDP and optional LLDP. HPE uses LLDP. Then open the Neighbors tab to draw the map." },
+    { q:"cdp detail", title:"CDP detail", cisco:"show cdp neighbors detail", provision:"(CDP uncommon) show cdp neighbors", comware:"display cdp neighbor", cx:"show cdp neighbor-info", note:"Use LLDP on HPE if CDP is empty." },
+    { q:"lldp", title:"LLDP neighbors", cisco:"show lldp neighbors", provision:"show lldp info remote-device", comware:"display lldp neighbor-information list", cx:"show lldp neighbor-info", note:"" },
+    { q:"version model inventory firmware", title:"Version / model", cisco:"show version", provision:"show version", comware:"display version", cx:"show version", note:"" },
+    { q:"inventory serial", title:"Inventory", cisco:"show inventory", provision:"show system", comware:"display device manuinfo", cx:"show inventory", note:"" },
+    { q:"interfaces status ports up down", title:"Interface status", cisco:"show interfaces status", provision:"show interfaces brief", comware:"display interface brief", cx:"show interface brief", note:"" },
+    { q:"ip interface brief svi", title:"L3 interface brief", cisco:"show ip interface brief", provision:"show ip", comware:"display ip interface brief", cx:"show ip interface brief", note:"" },
+    { q:"vlan", title:"VLAN list", cisco:"show vlan brief", provision:"show vlan", comware:"display vlan", cx:"show vlan", note:"" },
+    { q:"trunk allowed", title:"Trunks", cisco:"show interfaces trunk", provision:"show vlan ports", comware:"display port trunk", cx:"show interface trunk", note:"" },
+    { q:"mac address-table cam", title:"MAC table", cisco:"show mac address-table", provision:"show mac-address", comware:"display mac-address", cx:"show mac-address-table", note:"" },
+    { q:"spanning-tree stp rstp mstp", title:"Spanning tree", cisco:"show spanning-tree", provision:"show spanning-tree", comware:"display spanning-tree", cx:"show spanning-tree", note:"" },
+    { q:"log syslog messages", title:"Log", cisco:"show logging", provision:"show logging", comware:"display logbuffer", cx:"show events", note:"" },
+    { q:"running-config save write", title:"Running config", cisco:"show running-config", provision:"show running-config", comware:"display current-configuration", cx:"show running-config", note:"" },
+    { q:"save write memory startup", title:"Save to flash", cisco:"write memory", provision:"write memory", comware:"save", cx:"write memory", note:"Cisco also accepts copy running-config startup-config." },
+    { q:"environment power fan temperature psu", title:"Environment", cisco:"show env all", provision:"show system", comware:"display environment", cx:"show environment", note:"Some IOS: show environment" },
+    { q:"module stack", title:"Modules / stack", cisco:"show module", provision:"show modules", comware:"display device", cx:"show module", note:"" },
+    { q:"poe power over ethernet", title:"PoE", cisco:"show power inline", provision:"show power-over-ethernet brief", comware:"display poe-power", cx:"show power-over-ethernet", note:"" },
+    { q:"arp", title:"ARP", cisco:"show ip arp", provision:"show arp", comware:"display arp", cx:"show arp", note:"" },
+    { q:"route ip route", title:"Routing table", cisco:"show ip route", provision:"show ip route", comware:"display ip routing-table", cx:"show ip route", note:"" },
+    { q:"users who session", title:"Logged-in users", cisco:"show users", provision:"show session", comware:"display users", cx:"show user-session", note:"" },
+    { q:"clock time ntp", title:"Clock", cisco:"show clock", provision:"show time", comware:"display clock", cx:"show clock", note:"" },
+    { q:"interface configure access trunk description shutdown", title:"Enter config mode", cisco:"configure terminal", provision:"configure", comware:"system-view", cx:"configure terminal", note:"" },
+    { q:"enable privilege", title:"Privileged EXEC", cisco:"enable", provision:"(already manager #)", comware:"super", cx:"", note:"Cisco needs enable before most show commands in this GUI." }
+  ];
+
+  let resolvedOs = "provision";
+  const os = () => {
+    const v = $("os").value;
+    return v === "auto" ? resolvedOs : v;
+  };
+  const log = s => {
+    const clean = String(s).replace(/\x1b\[[0-9;?]*[A-Za-z]/g,"").replace(/\x1b./g,"");
+    termEl.textContent += clean;
+    termEl.scrollTop = termEl.scrollHeight;
+  };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const esc = s => String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+  function platformCmd(item) {
+    if (os()==="cisco") return item.cisco;
+    if (os()==="provision") return item.provision;
+    if (os()==="comware") return item.comware;
+    return item.cx;
+  }
+
+  function renderLib(filter) {
+    const q = (filter||"").toLowerCase().trim();
+    const items = LIB.filter(x => !q || (x.q+" "+x.title+" "+x.cisco).toLowerCase().includes(q));
+    $("libOut").innerHTML = items.map(x => {
+      const cmd = platformCmd(x);
+      return `<div class="lib-item">
+        <strong>${esc(x.title)}</strong>
+        <div style="margin-top:6px"><code>${esc(cmd||"—")}</code></div>
+        <div class="eq">Cisco: <code>${esc(x.cisco)}</code>${x.cisco2?" · <code>"+esc(x.cisco2)+"</code>":""}<br>
+        HPE ProVision: <code>${esc(x.provision)}</code> · Comware: <code>${esc(x.comware)}</code> · CX: <code>${esc(x.cx)}</code></div>
+        ${x.note?`<div class="eq">${esc(x.note)}</div>`:""}
+        <div class="actions"><button class="btn" data-runcmd="${esc(cmd)}">Run on switch</button>
+        ${/neighbor/i.test(x.q)?`<button class="btn ghost" data-map="1">Run and map</button>`:""}</div>
+      </div>`;
+    }).join("") || `<p class="hint">No match.</p>`;
+    $("libOut").querySelectorAll("[data-runcmd]").forEach(b => b.onclick = () => sendLines([b.dataset.runcmd]));
+    $("libOut").querySelectorAll("[data-map]").forEach(b => b.onclick = () => mapNeighbors(true,true));
+  }
+
+  function renderKpis() {
+    const up = state.ports.filter(p => p.link==="up").length;
+    const down = state.ports.filter(p => p.link==="down").length;
+    $("kpis").innerHTML = [
+      ["Model", state.model||"—", state.firmware||""],
+      ["Hostname", state.hostname||"—", ""],
+      ["Ports", String(state.ports.length||"—"), `${up} up · ${down} down`],
+      ["Neighbors", String(state.neighbors.length), "CDP/LLDP"],
+      ["Power", state.health.power, ""],
+      ["Temp", state.health.temp, ""]
+    ].map(([k,v,s])=>`<div class="kpi"><div class="k">${k}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`).join("");
+    $("modelBadge").textContent = state.model || "No inventory";
+    $("faceModel").textContent = state.model || "Not polled";
+    $("faceSub").textContent = [state.hostname, state.firmware].filter(Boolean).join(" · ") || "No inventory yet";
+  }
+
+  function shortId(id){ const m=String(id).match(/(\d+)(?:\/(\d+))?$/); return m ? (m[2]?m[1]+"/"+m[2]:m[1]) : id; }
+
+  function renderFaceplate() {
+    const box = $("faceplate"); box.innerHTML="";
+    let ports = state.ports.slice();
+    if (!ports.length) {
+      const n = Number($("portCount").value);
+      ports = Array.from({length:n},(_,i)=>({id:String(i+1),link:"unknown",admin:"unknown"}));
+    }
+    const chunks = [];
+    if (ports.length >= 48) {
+      chunks.push(ports.slice(0,24), ports.slice(24,48));
+      if (ports.length > 48) chunks.push(ports.slice(48));
+    } else if (ports.length > 24) {
+      chunks.push(ports.slice(0,24), ports.slice(24));
+    } else {
+      chunks.push(ports);
+    }
+    chunks.forEach((slice, idx) => {
+      const cap = document.createElement("div");
+      cap.className = "hint";
+      cap.style.margin = "6px 0 4px";
+      cap.textContent = idx === 2 ? "Uplink / SFP / 10G" : ("Copper row " + (idx+1));
+      box.appendChild(cap);
+      const row=document.createElement("div"); row.className="port-row";
+      slice.forEach(p=>{
+        const up=(p.link||"").toLowerCase()==="up";
+        const disabled=/down|disabled|no/.test((p.admin||"").toLowerCase()) && !up;
+        const el=document.createElement("div");
+        el.className="rj"+(up?" connected":"");
+        el.title=`${p.id} ${p.name||""} link=${p.link}`;
+        el.innerHTML=`<div class="leds"><span class="l ${disabled?"":(up?"link-up":"link-down")}"></span><span class="l ${up?"act-up":""}"></span></div><div class="slot"></div><div class="num">${esc(shortId(p.id))}</div>`;
+        el.onclick=()=>{$("portList").value=p.id};
+        row.appendChild(el);
+      });
+      box.appendChild(row);
+    });
+    const pwrOk=/ok|normal|good|up|on|unknown/i.test(state.health.power);
+    $("ledPwr").className="dot "+(state.model?(pwrOk?"green":"red"):"off");
+    $("ledSts").className="dot "+(state.model?(/fail|fault/i.test(state.health.status)?"red":"green"):"off");
+    $("ledFan").className="dot "+(state.model?(/fail/i.test(state.health.fan)?"red":"green"):"off");
+    $("ledTmp").className="dot "+(state.model?(/high|fail/i.test(state.health.temp)?"red":"green"):"off");
+    $("healthPower").innerHTML = state.health.details ? state.health.details.split("\n").slice(0,12).map(l=>`<div>${esc(l)}</div>`).join("") : "No data.";
+    $("healthEnv").innerHTML = state.health.modules ? state.health.modules.split("\n").slice(0,12).map(l=>`<div>${esc(l)}</div>`).join("") : "No data.";
+    $("portTable").innerHTML = state.ports.map(p=>{
+      const up=p.link==="up";
+      return `<tr><td>${esc(p.id)}</td><td>${esc(p.type||"")}</td><td>${esc(p.name||"")}</td><td>${esc(p.admin||"")}</td>
+        <td style="color:${up?"var(--ok)":"var(--danger)"}">${esc(p.link)}</td><td>${esc(p.mode||"")}</td>
+        <td>${up?"Connected (link)":((p.admin||"")==="down"?"Disabled":"No link")}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="hint">No interfaces parsed.</td></tr>`;
+  }
+
+  function iconPath(plat) {
+    const p=(plat||"").toLowerCase();
+    if (/phone|ip-phone|cp-/.test(p)) return "phone";
+    if (/ap|air-|c91|c28|aruba.?ap/.test(p)) return "ap";
+    if (/router|isr|asr|csr/.test(p)) return "rtr";
+    return "sw";
+  }
+
+  function drawTopo() {
+    const svg = $("topo");
+    const ns = "http://www.w3.org/2000/svg";
+    svg.setAttribute("viewBox", "0 0 1000 420");
+    svg.innerHTML = "";
+    const add = (tag, attrs, text) => {
+      const e = document.createElementNS(ns, tag);
+      Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));
+      if (text) e.textContent = text;
+      svg.appendChild(e);
+      return e;
+    };
+    add("rect",{x:0,y:0,width:1000,height:420,fill:"#f7fbf9"});
+    add("text",{x:24,y:28,fill:"#5c6b7a","font-size":"12","font-family":"Segoe UI"}, "Link-node view · LLDP / CDP");
+    const local = state.hostname || state.model || "This switch";
+    add("rect",{x:360,y:310,width:280,height:78,rx:12,fill:"#032c28",stroke:"#01a982","stroke-width":"2"});
+    add("circle",{cx:392,cy:349,r:8,fill:"#01a982"});
+    add("text",{x:500,y:342,"text-anchor":"middle",fill:"#fff","font-size":"14","font-weight":"700","font-family":"Segoe UI"}, local.slice(0,26));
+    add("text",{x:500,y:364,"text-anchor":"middle",fill:"#b7e8d8","font-size":"11","font-family":"Segoe UI"}, (state.model||"Local device").slice(0,32));
+    const nbs = state.neighbors.slice(0,6);
+    if (!nbs.length) {
+      add("text",{x:500,y:160,"text-anchor":"middle",fill:"#5c6b7a","font-size":"13","font-family":"Segoe UI"}, "No neighbors parsed — run Map CDP + LLDP");
+      return;
+    }
+    const gap = 1000 / (nbs.length + 1);
+    nbs.forEach((n,i) => {
+      const x = gap * (i + 1) - 90;
+      const y = 56;
+      const isHp = /hpe|aruba|procurve|2530|2930|3810|5400|jl\d/i.test((n.platform||"")+(n.device||""));
+      add("rect",{x,y,width:180,height:70,rx:10,fill:"#fff",stroke:isHp?"#01a982":"#0d5268","stroke-width":"1.6"});
+      add("circle",{cx:x+18,cy:y+20,r:6,fill:"#01a982"});
+      add("text",{x:x+90,y:y+24,"text-anchor":"middle",fill:"#032c28","font-size":"12","font-weight":"700","font-family":"Segoe UI"}, (n.device||"?").slice(0,20));
+      add("text",{x:x+90,y:y+42,"text-anchor":"middle",fill:"#5c6b7a","font-size":"10","font-family":"Segoe UI"}, (n.platform||n.proto||"").slice(0,24));
+      add("text",{x:x+90,y:y+58,"text-anchor":"middle",fill:"#0d5268","font-size":"10","font-family":"Segoe UI"}, (n.remote||"").slice(0,18));
+      add("line",{x1:x+90,y1:y+70,x2:500,y2:310,stroke:"#01a982","stroke-width":"2.2"});
+      add("rect",{x:(x+90+500)/2-46,y:(y+70+310)/2-10,width:92,height:18,rx:9,fill:"#fff",stroke:"#cfe8df"});
+      add("text",{x:(x+90+500)/2,y:(y+70+310)/2+3,"text-anchor":"middle",fill:"#0b5c4a","font-size":"10","font-family":"Segoe UI"},
+        `${n.local||"?"} →`);
+    });
+  }
+
+  function renderNeighbors() {
+    drawTopo();
+    $("neighTable").innerHTML = state.neighbors.map(n =>
+      `<tr><td>${esc(n.proto)}</td><td>${esc(n.device)}</td><td>${esc(n.platform)}</td><td>${esc(n.local)}</td><td>${esc(n.remote)}</td></tr>`
+    ).join("") || `<tr><td colspan="5" class="hint">No neighbors parsed.</td></tr>`;
+    renderKpis();
+  }
+
+  function renderAll(){ renderKpis(); renderFaceplate(); renderNeighbors(); }
+
+  function markConnected(label){
+    $("btnConnect").disabled = true; $("btnDisconnect").disabled=false; $("btnPoll").disabled=false;
+    $("connBadge").textContent=label || "Connected"; $("connBadge").className="badge on";
+  }
+  async function connectNet(){
+    const proto = $("access").value;
+    const res = await fetch("/api/connect", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        proto,
+        host: $("netHost").value.trim(),
+        port: Number($("netPort").value || (proto==="ssh"?22:23)),
+        user: $("netUser").value.trim(),
+        password: $("netPass").value
+      })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || "connect failed");
+    netMode = true;
+    if (evtSrc) try{ evtSrc.close(); }catch(_){}
+    evtSrc = new EventSource("/api/events");
+    evtSrc.onmessage = ev => {
+      try {
+        const t = JSON.parse(ev.data);
+        rxBuf += t; log(t);
+      } catch(_) {}
+    };
+    evtSrc.addEventListener("close", () => log("\n[remote session ended]\n"));
+    markConnected(proto.toUpperCase()+" "+$("netHost").value.trim());
+    if ($("autoPoll").checked) setTimeout(()=>pollInventory().catch(e=>log("\n[poll] "+e.message+"\n")),1200);
+  }
+  async function connect() {
+    const mode = $("access").value;
+    try {
+      if (mode === "ssh" || mode === "telnet") {
+        await connectNet();
+        return;
+      }
+      if (!("serial" in navigator)) { alert("Use Chrome or Edge on http://localhost."); return; }
+      port = await navigator.serial.requestPort();
+      await port.open({baudRate:Number($("baud").value),dataBits:8,stopBits:1,parity:"none",flowControl:"none"});
+      writer = port.writable.getWriter();
+      keepReading = true;
+      netMode = false;
+      markConnected("Serial");
+      readLoop();
+      await writeRaw("\r");
+      if ($("autoPoll").checked) setTimeout(()=>pollInventory().catch(e=>log("\n[poll] "+e.message+"\n")),900);
+    } catch(e){ log("\n[connect] "+e.message+"\n"); }
+  }
+  async function disconnect(){
+    keepReading=false;
+    if (netMode) {
+      try { await fetch("/api/disconnect",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); } catch(_){}
+      try { if (evtSrc) evtSrc.close(); } catch(_){}
+      evtSrc=null; netMode=false;
+    }
+    try{if(reader){await reader.cancel();reader.releaseLock();}}catch(_){}
+    try{if(writer)writer.releaseLock();}catch(_){}
+    try{if(port)await port.close();}catch(_){}
+    reader=writer=port=null;
+    $("btnConnect").disabled=false;$("btnDisconnect").disabled=true;$("btnPoll").disabled=true;
+    $("connBadge").textContent="Disconnected"; $("connBadge").className="badge off";
+  }
+  async function readLoop(){
+    reader=port.readable.getReader();
+    try{
+      while(keepReading){
+        const {value,done}=await reader.read();
+        if(done)break;
+        if(value){ const t=decoder.decode(value); rxBuf+=t; log(t); }
+      }
+    }catch(e){log("\n[read] "+e.message+"\n");}
+    finally{try{reader.releaseLock();}catch(_){}}
+  }
+  async function writeRaw(s){
+    if (netMode) {
+      const res = await fetch("/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:s})});
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "send failed");
+      return;
+    }
+    if(!writer) throw new Error("not connected");
+    await writer.write(encoder.encode(s));
+  }
+  function looksLikePrompt(buf){
+    const tail=buf.slice(-100).replace(/\r/g,"");
+    return /[#>] ?$/.test((tail.split("\n").pop()||"")) || /--More--|More:/i.test(tail);
+  }
+  async function exec(cmd, waitMs){
+    const start=rxBuf.length;
+    await writeRaw(cmd+"\r");
+    const deadline=Date.now()+(waitMs||4000);
+    while(Date.now()<deadline){
+      await sleep(120);
+      const chunk=rxBuf.slice(start);
+      if (/--More--|More:/i.test(chunk)) { await writeRaw(" "); await sleep(250); continue; }
+      if (looksLikePrompt(chunk) && chunk.length>cmd.length+2) break;
+    }
+    return rxBuf.slice(start);
+  }
+  async function sendLines(lines, previewId){
+    if(previewId) $(previewId).textContent=lines.join("\n");
+    if(!writer){ log("\n[preview only]\n"); return; }
+    for(const line of lines){
+      if(String(line).startsWith("!")){ log("\n"+line+"\n"); continue; }
+      await exec(line, 2000);
+    }
+  }
+
+  function stripAnsi(s){ return s.replace(/\x1b\[[0-9;]*[A-Za-z]/g,"").replace(/\r/g,""); }
+
+  function detectPlatform(text){
+    const t = stripAnsi(text);
+    if (/Cisco IOS|IOS-XE|IOS Software|cisco WS-|C9300|C9200|C3750|C2960/i.test(t)) return "cisco";
+    if (/ArubaOS-CX|Aruba CX|6300M|6200F|6100/i.test(t)) return "cx";
+    if (/Comware|HPE Comware|HP Comware/i.test(t)) return "comware";
+    if (/ProCurve|ProVision|ArubaOS-S|Software revision\s+[A-Z]{1,2}\.|J9850A|5406R|2930F|2530|zl2/i.test(t)) return "provision";
+    return null;
+  }
+  function parseVersion(text){
+    text=stripAnsi(text);
+    const det = detectPlatform(text);
+    if (det) {
+      resolvedOs = det;
+      if ($("os").value === "auto") {
+        $("osBadge").textContent = "Auto → " + det;
+      }
+    }
+    const model = text.match(/Model [Nn]umber\s*:\s*(\S+)/) ||
+                  text.match(/cisco\s+(WS-\S+|C\d{4}[A-Z0-9-]+)/i) ||
+                  text.match(/\b((?:Aruba|HPE|HP|ProCurve)\s+\d{3,5}[A-Z0-9-]*)\b/i) ||
+                  text.match(/\b(JL\d{3,4}[A-Z]?|J\d{3,4}[A-Z]?)\b/);
+    const fw = text.match(/Version\s+(\S+)/) || text.match(/Software revision\s*:\s*(\S+)/i);
+    const host = text.match(/^(\S+)\s*[#>]/m) || text.match(/uptime is/);
+    if(model) state.model=model[1].trim();
+    if(fw) state.firmware=fw[1].replace(/,$/,"");
+    const hn = text.match(/^(\S+)\s+uptime/m);
+    if(hn) state.hostname=hn[1];
+  }
+
+  function parseInterfaces(text){
+    text=stripAnsi(text);
+    const ports=[];
+    for(const line of text.split("\n")){
+      const l=line.trim();
+      if(!l||/^Port\b|^Interface\b|^-+/.test(l)) continue;
+      let m=l.match(/^(\S+)\s+(.*?)\s+(connected|notconnect|disabled|err-disabled|inactive|up|down)\s+(\S+)\s+(\S+)\s+(\S+)/i);
+      if(m && /^(Gi|Fa|Te|Tw|Eth|Po|Gi\d|Fa\d)/i.test(m[1])){
+        const st=m[3].toLowerCase();
+        ports.push({id:m[1],name:m[2].trim(),admin:st==="disabled"?"down":"up",link:(st==="connected"||st==="up")?"up":"down",mode:m[4]+" "+m[5],type:m[6],connected:st==="connected"||st==="up"});
+        continue;
+      }
+      m=l.match(/^(GigabitEthernet|FastEthernet|TenGigabitEthernet|Ethernet)(\S+)\s+\S+\s+\S+\s+(up|down|administratively down)\s+(up|down)/i);
+      if(m){
+        ports.push({id:m[1].slice(0,2)+m[2],name:"",admin:/admin/i.test(m[3])?"down":"up",link:m[4].toLowerCase(),mode:"",type:"",connected:m[4].toLowerCase()==="up"});
+        continue;
+      }
+      m=l.match(/^(\S+)\s+(\S+)\s+\|?\s*\S*\s+(Yes|No)\s+(Up|Down)\s+(\S+)/i);
+      if(m){ ports.push({id:m[1],type:m[2],name:"",admin:/yes/i.test(m[3])?"up":"down",link:m[4].toLowerCase(),mode:m[5],connected:/up/i.test(m[4])}); continue; }
+      m=l.match(/^((?:GE|Gi|Te|XGE)[\w/.-]*)\s+(UP|DOWN|ADM)\s+(UP|DOWN)/i);
+      if(m){ ports.push({id:m[1],type:"",name:"",admin:m[2].toUpperCase()==="UP"?"up":"down",link:m[3].toLowerCase()==="up"?"up":"down",mode:"",connected:m[3].toUpperCase()==="UP"}); }
+    }
+    const uniq=[], seen=new Set();
+    for(const p of ports){ if(seen.has(p.id)) continue; seen.add(p.id); uniq.push(p); }
+    if(uniq.length) state.ports=uniq;
+  }
+
+  function parseHealth(text){
+    text=stripAnsi(text);
+    const lines=text.split("\n").map(s=>s.trim()).filter(s=>/power|psu|fan|temp|sensor|ok|fail|normal|module|slot|status/i.test(s)).slice(0,40);
+    if(/power|psu/i.test(text)) state.health.power=/fail|bad/i.test(text)?"fault":"ok";
+    if(/fan/i.test(text)) state.health.fan=/fail/i.test(text)?"fault":"ok";
+    const t=text.match(/(\d{2,3})\s*C/); if(t) state.health.temp=t[1]+" °C";
+    if(/power|psu|env/i.test(text) && lines.length) state.health.details=lines.join("\n");
+    else if(lines.length) state.health.modules=lines.join("\n");
+    if(state.model) state.health.status=/fail|critical/i.test(text)?"fault":"ok";
+  }
+
+  function parseNeighbors(text, proto){
+    text=stripAnsi(text);
+    const found=[];
+    const lines=text.split("\n");
+    for(const line of lines){
+      const l=line.trim();
+      if(!l || /Device ID|Local Intrfce|Capability|Holdtme|System Name|Local Intf|--/.test(l)) continue;
+      // Cisco CDP: DeviceID  LocalIntf Holdtime Cap Platform PortID
+      let m=l.match(/^(\S+)\s+(Gig?\s?\S+|Fas?\s?\S+|Ten\s?\S+|Eth\s?\S+|Gi\S+|Fa\S+|Te\S+|Tw\S+)\s+\d+\s+\S*\s+(\S+)\s+(\S+)/i);
+      if(m){ found.push({proto:proto||"CDP",device:m[1],local:m[2].replace(/\s+/g,""),platform:m[3],remote:m[4]}); continue; }
+      // Cisco LLDP: DeviceID LocalIntf Hold Cap PortID
+      m=l.match(/^(\S+)\s+(Gi\S+|Fa\S+|Te\S+|Tw\S+|Gig?\s?\S+)\s+\d+\s+\S*\s+(\S+)/);
+      if(m && !found.some(f=>f.device===m[1]&&f.local===m[2])){
+        found.push({proto:proto||"LLDP",device:m[1],local:m[2].replace(/\s+/g,""),platform:"",remote:m[3]});
+        continue;
+      }
+      // HP LLDP remote-device often: Port | Neighbor | Neighbor Port
+      m=l.match(/^(\S+)\s+\|\s+(\S+)\s+\|\s+(\S+)/);
+      if(m){ found.push({proto:"LLDP",device:m[2],local:m[1],platform:"",remote:m[3]}); }
+    }
+    if(found.length){
+      const key=n=>n.proto+"|"+n.device+"|"+n.local;
+      const map=new Map(state.neighbors.map(n=>[key(n),n]));
+      found.forEach(n=>map.set(key(n),n));
+      state.neighbors=[...map.values()];
+    }
+  }
+
+  async function disablePaging(){
+    try{
+      if(os()==="cisco"){ await exec("terminal length 0",1500); }
+      else if(os()==="provision") await exec("no page",1200);
+      else if(os()==="comware") await exec("screen-length disable",1200);
+      else await exec("no page",800);
+    }catch(_){}
+  }
+
+  async function pollInventory(){
+    if(!writer && !netMode) return;
+    $("btnPoll").disabled=true; $("faceSub").textContent="Polling…";
+    try{
+      if ($("os").value === "auto") {
+        const probe = await exec("show version", 5000);
+        parseVersion(probe);
+        if (!detectPlatform(probe)) {
+          const p2 = await exec("display version", 4000);
+          parseVersion(p2);
+        }
+      }
+      await disablePaging();
+      const jobs = os()==="cisco"
+        ? ["show version","show inventory","show env all","show interfaces status","show ip interface brief"]
+        : os()==="comware"
+          ? ["display version","display device","display environment","display interface brief"]
+          : os()==="cx"
+            ? ["show system","show inventory","show environment","show interface brief"]
+            : ["show version","show system","show interfaces brief"];
+      for(const cmd of jobs){
+        const out=await exec(cmd,6000);
+        if(/version|inventory|system/i.test(cmd)) parseVersion(out);
+        if(/interface/i.test(cmd)) parseInterfaces(out);
+        if(/env|system|module|power|device|inventory/i.test(cmd)) parseHealth(out);
+      }
+      if (state.hostname || state.model) {
+        const suggested = (state.hostname || state.model).replace(/\s+/g,"-");
+        if (!$("profileName").value) $("profileName").value = suggested;
+      }
+      if (state.ports.length >= 48) $("portCount").value = state.ports.length > 48 ? "52" : "48";
+      renderAll();
+    }catch(e){ log("\n[poll] "+e.message+"\n"); }
+    finally{ $("btnPoll").disabled=false; }
+  }
+
+  async function mapNeighbors(doCdp, doLldp){
+    if(!writer){ log("\nConnect first.\n"); return; }
+    await disablePaging();
+    state.neighbors=[];
+    if(os()==="cisco"){
+      if(doCdp) parseNeighbors(await exec("show cdp neighbors",5000),"CDP");
+      if(doLldp) parseNeighbors(await exec("show lldp neighbors",5000),"LLDP");
+    } else if(os()==="provision"){
+      parseNeighbors(await exec("show lldp info remote-device",5000),"LLDP");
+      try{ parseNeighbors(await exec("show cdp neighbors",2500),"CDP"); }catch(_){}
+    } else if(os()==="comware"){
+      parseNeighbors(await exec("display lldp neighbor-information list",5000),"LLDP");
+    } else {
+      parseNeighbors(await exec("show lldp neighbor-info",5000),"LLDP");
+    }
+    renderNeighbors();
+    document.querySelector('[data-tab="neigh"]').click();
+  }
+
+  function ifName(list){
+    const raw=list.trim(), prefix=$("ifPrefix").value.trim();
+    if(os()==="cisco"){
+      if(/[A-Za-z]/.test(raw)) return raw;
+      return raw.split(",").map(p=>prefix+p.trim()).join(",");
+    }
+    if(os()==="provision") return raw;
+    return prefix+raw;
+  }
+  function cmdsSystem(){
+    const h=$("hostname").value.trim(), loc=$("location").value.trim();
+    if(os()==="cisco") return ["configure terminal", h&&"hostname "+h, loc&&"snmp-server location "+loc, "end"].filter(Boolean);
+    if(os()==="provision") return ["configure", h&&"hostname "+h, loc&&`snmp-server location "${loc}"`].filter(Boolean);
+    if(os()==="comware") return ["system-view", h&&"sysname "+h].filter(Boolean);
+    return ["configure terminal", h&&"hostname "+h].filter(Boolean);
+  }
+  function cmdsMgmt(){
+    const vid=$("mgmtVlan").value.trim(), ip=$("mgmtIp").value.trim(), mask=$("mgmtMask").value.trim()||"255.255.255.0", gw=$("mgmtGw").value.trim();
+    if(!vid||!ip) return ["! VLAN and IP required"];
+    if(os()==="cisco") return ["configure terminal","interface vlan "+vid,"ip address "+ip+" "+mask,"no shutdown","exit", gw&&"ip default-gateway "+gw,"end"].filter(Boolean);
+    if(os()==="provision") return ["configure","vlan "+vid,"ip address "+ip+" "+mask,"exit",gw&&"ip default-gateway "+gw].filter(Boolean);
+    if(os()==="comware") return ["system-view","interface Vlan-interface"+vid,"ip address "+ip+" "+mask,"quit"];
+    return ["configure terminal","interface vlan "+vid,"ip address "+ip+"/24","exit"];
+  }
+  function cmdsSecurity(){
+    const u=$("adminUser").value.trim()||"admin", p=$("adminPass").value, p2=$("adminPass2").value, en=$("enableSecret").value;
+    if(p&&p!==p2) return ["! Passwords do not match"];
+    if(os()==="cisco") return ["configure terminal", p&&`username ${u} privilege 15 secret ${p}`, en&&"enable secret "+en, "end"].filter(Boolean);
+    if(os()==="provision") return ["configure", p&&"password manager plaintext "+p].filter(Boolean);
+    if(os()==="comware") return ["system-view","local-user "+u,"password simple "+p,"quit"];
+    return ["configure terminal",`user ${u} group administrators password plaintext ${p}`];
+  }
+  function cmdsVlan(del){
+    const id=$("vlanId").value.trim(), name=$("vlanName").value.trim(), untag=$("vlanUntag").value.trim(), tag=$("vlanTag").value.trim();
+    if(!id) return ["! VLAN ID required"];
+    if(del){
+      if(os()==="cisco") return ["configure terminal","no vlan "+id,"end"];
+      if(os()==="comware") return ["system-view","undo vlan "+id];
+      return ["configure","no vlan "+id];
+    }
+    if(os()==="cisco"){
+      const lines=["configure terminal","vlan "+id, name&&"name "+name,"exit"];
+      if(untag) untag.split(",").forEach(p=>{ lines.push("interface "+ifName(p.trim()),"switchport mode access","switchport access vlan "+id,"exit"); });
+      if(tag) tag.split(",").forEach(p=>{ lines.push("interface "+ifName(p.trim()),"switchport mode trunk","switchport trunk allowed vlan add "+id,"exit"); });
+      lines.push("end"); return lines.filter(Boolean);
+    }
+    if(os()==="provision") return ["configure","vlan "+id,name&&`name "${name}"`,untag&&"untagged "+untag,tag&&"tagged "+tag,"exit"].filter(Boolean);
+    return ["configure terminal","vlan "+id,name&&"name "+name,"exit"].filter(Boolean);
+  }
+  function cmdsPort(kind){
+    const list=$("portList").value.trim(); if(!list) return ["! Port required"];
+    const name=$("portName").value.trim(), acc=$("portAccessVlan").value.trim(), tr=$("portTrunkVlans").value.trim();
+    if(os()==="cisco"){
+      const body=["configure terminal","interface "+ifName(list)];
+      if(kind==="port-up") body.push("no shutdown");
+      if(kind==="port-down") body.push("shutdown");
+      if(kind==="port-name") body.push("description "+name);
+      if(kind==="port-access") body.push("switchport mode access","switchport access vlan "+acc);
+      if(kind==="port-trunk") body.push("switchport mode trunk","switchport trunk allowed vlan "+tr);
+      body.push("end"); return body;
+    }
+    if(os()==="provision"){
+      if(kind==="port-up") return ["configure","interface "+list,"enable","exit"];
+      if(kind==="port-down") return ["configure","interface "+list,"disable","exit"];
+      if(kind==="port-name") return ["configure","interface "+list,`name "${name}"`,"exit"];
+      if(kind==="port-access") return ["configure","vlan "+acc,"untagged "+list,"exit"];
+      if(kind==="port-trunk") return ["configure",...tr.split(",").flatMap(v=>["vlan "+v.trim(),"tagged "+list,"exit"])];
+    }
+    if(os()==="comware"){
+      const body=["system-view","interface "+ifName(list)];
+      if(kind==="port-up") body.push("undo shutdown");
+      if(kind==="port-down") body.push("shutdown");
+      if(kind==="port-name") body.push("description "+name);
+      if(kind==="port-access") body.push("port link-type access","port access vlan "+acc);
+      if(kind==="port-trunk") body.push("port link-type trunk","port trunk permit vlan "+tr.replace(/,/g," "));
+      body.push("quit"); return body;
+    }
+    const body=["configure terminal","interface "+ifName(list)];
+    if(kind==="port-up") body.push("no shutdown");
+    if(kind==="port-down") body.push("shutdown");
+    if(kind==="port-name") body.push("description "+name);
+    if(kind==="port-access") body.push("vlan access "+acc);
+    if(kind==="port-trunk") body.push("vlan trunk allowed "+tr);
+    body.push("exit"); return body;
+  }
+  function cmdsSave(){ return os()==="comware"?["save","Y"]: os()==="cisco"?["write memory"]:["write memory"]; }
+  function cmdsShow(k){
+    const map={
+      cisco:{vlan:"show vlan brief",int:"show interfaces status",run:"show running-config",ver:"show version",log:"show logging",stp:"show spanning-tree",mac:"show mac address-table"},
+      provision:{vlan:"show vlan",int:"show interfaces brief",run:"show running-config",ver:"show version",log:"show logging",stp:"show spanning-tree",mac:"show mac-address"},
+      comware:{vlan:"display vlan",int:"display interface brief",run:"display current-configuration",ver:"display version",log:"display logbuffer",stp:"display spanning-tree",mac:"display mac-address"},
+      cx:{vlan:"show vlan",int:"show interface brief",run:"show running-config",ver:"show version",log:"show events",stp:"show spanning-tree",mac:"show mac-address-table"}
+    };
+    return [map[os()][k]];
+  }
+
+  document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".pane").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active"); $("tab-"+t.dataset.tab).classList.add("active");
+  }));
+  $("access").addEventListener("change",()=>{
+    const m=$("access").value;
+    $("netFields").style.display = (m==="ssh"||m==="telnet") ? "flex" : "none";
+    $("netPort").value = m==="telnet" ? "23" : "22";
+  });
+  $("os").addEventListener("change",()=>{
+    $("osBadge").textContent=$("os").options[$("os").selectedIndex].text.split("/")[0].trim();
+    if(os()==="cisco") $("ifPrefix").value="GigabitEthernet0/";
+    if(os()==="cx") $("ifPrefix").value="1/1/";
+    if(os()==="comware") $("ifPrefix").value="GigabitEthernet1/0/";
+    renderLib($("libQ").value);
+  });
+  $("portCount").addEventListener("change", renderFaceplate);
+  $("btnConnect").onclick=connect;
+  $("btnDisconnect").onclick=disconnect;
+  $("btnWake").onclick=()=>writeRaw("\r").catch(()=>{});
+  $("btnPoll").onclick=()=>pollInventory();
+  $("btnEnable").onclick=()=>sendLines(["enable"]);
+  $("btnEnterConfig").onclick=()=>sendLines([os()==="cisco"||os()==="cx"?"configure terminal":os()==="comware"?"system-view":"configure"]);
+  $("btnSave").onclick=()=>{ if(confirm("Save running configuration to flash?")) sendLines(cmdsSave()); };
+  $("btnClearTerm").onclick=()=>{ termEl.textContent=""; };
+  const wrap = $("termWrap");
+  let termMode = "normal";
+  let termSavedH = 240;
+  function setTermMode(mode){
+    wrap.classList.remove("term-min","term-max");
+    if (mode === "min") wrap.classList.add("term-min");
+    if (mode === "max") wrap.classList.add("term-max");
+    termMode = mode;
+    $("btnTermMin").title = mode === "min" ? "Restore" : "Minimize";
+    $("btnTermMax").title = mode === "max" ? "Restore" : "Expand";
+    $("icoMax").innerHTML = mode === "max"
+      ? '<path d="M5 5h6v6H5z"/><path d="M3 8V3h5M13 8v5H8"/>'
+      : '<rect x="3" y="3" width="10" height="10" rx="1"/>';
+    if (mode === "normal") wrap.style.setProperty("--term-h", termSavedH+"px");
+  }
+  $("termScale").oninput = e => {
+    termSavedH = Number(e.target.value);
+    setTermMode("normal");
+  };
+  $("btnTermMin").onclick = () => setTermMode(termMode === "min" ? "normal" : "min");
+  $("btnTermMax").onclick = () => setTermMode(termMode === "max" ? "normal" : "max");
+  (() => {
+    const handle = $("termResize");
+    let startY=0, startH=240;
+    handle.addEventListener("mousedown", ev => {
+      ev.preventDefault();
+      startY = ev.clientY;
+      startH = wrap.getBoundingClientRect().height;
+      const move = e => {
+        const h = Math.min(700, Math.max(120, startH + (startY - e.clientY)));
+        termSavedH = h;
+        $("termScale").value = String(h);
+        setTermMode("normal");
+      };
+      const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    });
+  })();
+  const PROFILE_KEY = "scg-profiles-v1";
+  function loadProfiles(){
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY)||"[]"); } catch(_){ return []; }
+  }
+  function renderProfiles(){
+    const sel = $("profileSel");
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">— none —</option>` + loadProfiles().map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("");
+    if (cur) sel.value = cur;
+  }
+  $("btnSaveProfile").onclick = () => {
+    const name = $("profileName").value.trim() || state.hostname || state.model;
+    if (!name) { alert("Enter a profile name after poll, or type one."); return; }
+    $("profileName").value = name;
+    const list = loadProfiles().filter(p => p.name !== name);
+    list.push({
+      name,
+      os: $("os").value === "auto" ? resolvedOs : $("os").value,
+      access: $("access").value,
+      host: $("netHost").value,
+      port: $("netPort").value,
+      user: $("netUser").value,
+      baud: $("baud").value,
+      prefix: $("ifPrefix").value,
+      portCount: $("portCount").value,
+      model: state.model,
+      hostname: state.hostname
+    });
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(list));
+    renderProfiles();
+    $("profileSel").value = name;
+  };
+  $("btnDelProfile").onclick = () => {
+    const name = $("profileSel").value;
+    if (!name) return;
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(loadProfiles().filter(p=>p.name!==name)));
+    $("profileName").value = "";
+    renderProfiles();
+  };
+  $("profileSel").onchange = () => {
+    const p = loadProfiles().find(x => x.name === $("profileSel").value);
+    if (!p) return;
+    $("profileName").value = p.name;
+    $("os").value = p.os || "provision";
+    resolvedOs = p.os || "provision";
+    $("access").value = p.access || "serial";
+    $("access").dispatchEvent(new Event("change"));
+    $("netHost").value = p.host || "";
+    $("netPort").value = p.port || "22";
+    $("netUser").value = p.user || "";
+    $("baud").value = p.baud || "9600";
+    $("ifPrefix").value = p.prefix || "";
+    $("portCount").value = p.portCount || "48";
+    $("os").dispatchEvent(new Event("change"));
+    renderFaceplate();
+  };
+  $("btnSendLogin").onclick = async () => {
+    const u = $("conUser").value.trim();
+    const p = $("conPass").value;
+    if (!u && !p) { log("\n[login] Enter the switch account name, not a CLI command.\n"); return; }
+    if (u) await sendLines([u]);
+    await sleep(400);
+    if (p) await sendLines([p]);
+  };
+  renderProfiles();
+  $("btnMap").onclick=()=>mapNeighbors(true,true);
+  $("btnCdp").onclick=()=>mapNeighbors(true,false);
+  $("btnLldp").onclick=()=>mapNeighbors(false,true);
+  $("btnLibSearch").onclick=()=>renderLib($("libQ").value);
+  $("btnLibAll").onclick=()=>{ $("libQ").value=""; renderLib(""); };
+  $("libQ").addEventListener("keydown", e=>{ if(e.key==="Enter") renderLib($("libQ").value); });
+  document.querySelectorAll("[data-apply]").forEach(btn=>btn.onclick=()=>{
+    const k=btn.dataset.apply; let lines=[], prev="";
+    if(k==="system"){lines=cmdsSystem();prev="prev-system";}
+    if(k==="mgmt"){lines=cmdsMgmt();prev="prev-mgmt";}
+    if(k==="security"){lines=cmdsSecurity();prev="prev-security";}
+    if(k==="vlan"){lines=cmdsVlan(false);prev="prev-vlan";}
+    if(k==="vlan-del"){lines=cmdsVlan(true);prev="prev-vlan";}
+    if(k.startsWith("port")){lines=cmdsPort(k);prev="prev-port";}
+    sendLines(lines,prev);
+  });
+  document.querySelectorAll("[data-show]").forEach(btn=>btn.onclick=()=>sendLines(cmdsShow(btn.dataset.show)));
+  const sendRaw=()=>{
+    const v=$("rawCmd").value.trim(); if(!v) return;
+    const hit=LIB.find(x=>x.q.split(" ").includes(v.toLowerCase()) || x.title.toLowerCase()===v.toLowerCase());
+    if(hit && !v.includes(" ")){
+      if(/neighbor/i.test(hit.q)) mapNeighbors(true,true);
+      else sendLines([platformCmd(hit)]);
+    } else sendLines([v]);
+    $("rawCmd").value="";
+  };
+  $("btnSendRaw").onclick=sendRaw;
+  $("rawCmd").addEventListener("keydown",e=>{ if(e.key==="Enter") sendRaw(); });
+
+  renderLib("");
+  renderAll();
+
+  const TOUR = [
+    { el:null, tab:"guide", title:"Welcome", body:"This short tour shows each control. The rest of the page is dimmed and blurred. Use Next and Back. Nothing is sent to the switch during the tour." },
+    { el:"#os", tab:"guide", title:"1. Choose the platform", body:"Select Cisco IOS first for your initial tests. Change later to ProVision, Comware, or Aruba CX. Commands and parsers follow this setting." },
+    { el:"#baud", tab:"guide", title:"2. Set baud rate", body:"Cisco consoles are usually 9600 8-N-1. If the console pane shows garbage characters, try 115200." },
+    { el:"#btnConnect", tab:"guide", title:"3. Connect console", body:"Chrome or Edge will ask you to pick the COM / USB-serial port. The page must be opened from http://localhost, not as a file." },
+    { el:"#btnEnable", tab:"guide", title:"4. Reach privileged EXEC", body:"After login, click enable so the prompt ends with #. Most inventory and neighbor commands need that mode on Cisco." },
+    { el:"#btnPoll", tab:"guide", title:"5. Poll inventory", body:"Reads version, interfaces, and environment. The Dashboard faceplate and health pills fill from that output." },
+    { el:"#tourTabs", tab:"dash", title:"6. Main menus", body:"These tabs are the primary navigation: Guide, Dashboard (faceplate), Neighbors (topology), CLI library, Ports, and configuration pages." },
+    { el:"#faceplate", tab:"dash", title:"7. Dashboard faceplate", body:"Each RJ45 drawing is a port. Green LED = link up. Red = enabled with no link. Click a port to load it into Port config." },
+    { el:"#btnMap", tab:"neigh", title:"8. Neighbor map", body:"Map CDP + LLDP runs discovery and draws a Central-style link-node view: this switch at the bottom, peers above, local and remote ports on each link." },
+    { el:"#libQ", tab:"lib", title:"9. CLI library", body:"Type everyday words such as neighbors, vlan, trunk, or save. Each card shows the Cisco command and the HPE equivalent. Run sends it for the selected platform." },
+    { el:"#rawCmd", tab:"lib", title:"10. Console line", body:"Use this bar for login, enable passwords, and raw CLI. Typing neighbors here also opens the map." },
+    { el:"#btnSave", tab:"guide", title:"11. Save configuration", body:"Writes running-config to flash (write memory or save). Confirm the preview and the console response before you rely on it." }
+  ];
+  let tourI = 0;
+  function openTab(name){
+    const t = document.querySelector('.tab[data-tab="'+name+'"]');
+    if (t) t.click();
+  }
+  function placeTour(){
+    const step = TOUR[tourI];
+    document.querySelectorAll(".tour-target").forEach(n=>n.classList.remove("tour-target"));
+    if (step.tab) openTab(step.tab);
+    $("tourTitle").textContent = step.title;
+    $("tourBody").textContent = step.body;
+    $("tourStep").textContent = (tourI+1) + " / " + TOUR.length;
+    $("tourNext").textContent = tourI === TOUR.length-1 ? "Finish" : "Next";
+    $("tourPrev").disabled = tourI === 0;
+    const spot = $("tourSpot"), card = $("tourCard");
+    requestAnimationFrame(()=>{
+      const target = step.el ? document.querySelector(step.el) : null;
+      if (target) {
+        target.classList.add("tour-target");
+        target.scrollIntoView({block:"center", inline:"nearest"});
+        const r = target.getBoundingClientRect();
+        const pad = 8;
+        spot.style.display = "block";
+        spot.style.left = (r.left-pad)+"px";
+        spot.style.top = (r.top-pad)+"px";
+        spot.style.width = (r.width+pad*2)+"px";
+        spot.style.height = (r.height+pad*2)+"px";
+        let top = r.bottom + 14;
+        let left = Math.min(Math.max(16, r.left), window.innerWidth-376);
+        if (top + 200 > window.innerHeight) top = Math.max(16, r.top - 210);
+        card.style.left = left+"px";
+        card.style.top = top+"px";
+      } else {
+        spot.style.display = "none";
+        card.style.left = "50%";
+        card.style.top = "22%";
+        card.style.transform = "translateX(-50%)";
+      }
+      if (step.el) card.style.transform = "none";
+    });
+  }
+  function startTour(){
+    tourI = 0;
+    $("tourOverlay").classList.add("on");
+    document.body.classList.add("tour-lock");
+    $("tourCard").style.transform = "none";
+    placeTour();
+  }
+  function endTour(){
+    $("tourOverlay").classList.remove("on");
+    document.body.classList.remove("tour-lock");
+    document.querySelectorAll(".tour-target").forEach(n=>n.classList.remove("tour-target"));
+  }
+  $("btnTour").onclick = startTour;
+  $("btnTour2").onclick = startTour;
+  $("tourSkip").onclick = endTour;
+  $("tourNext").onclick = ()=>{ if (tourI >= TOUR.length-1) endTour(); else { tourI++; placeTour(); } };
+  $("tourPrev").onclick = ()=>{ if (tourI>0){ tourI--; placeTour(); } };
+  $("tourBlur").onclick = endTour;
+  window.addEventListener("resize", ()=>{ if ($("tourOverlay").classList.contains("on")) placeTour(); });
+  if (!sessionStorage.getItem("scg-tour-seen")) {
+    sessionStorage.setItem("scg-tour-seen","1");
+    setTimeout(startTour, 400);
+  }
+})();
+</script>
+</body>
+</html>
